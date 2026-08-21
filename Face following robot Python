@@ -1,0 +1,182 @@
+import cv2
+import requests
+
+ESP32_IP = "192.168.4.1"
+
+FACE_CENTER_TOLERANCE = 60
+
+FAR_FACE = 12000
+CLOSE_FACE = 45000
+
+face_cascade = cv2.CascadeClassifier(
+    "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml"
+)
+
+cap = cv2.VideoCapture(0)
+
+if not cap.isOpened():
+    print("Camera not found!")
+    exit()
+
+def send(left, right):
+    try:
+        requests.get(
+            f"http://{ESP32_IP}/drive?left={left}&right={right}",
+            timeout=0.1
+        )
+    except:
+        pass
+
+def stop():
+    try:
+        requests.get(
+            f"http://{ESP32_IP}/stop",
+            timeout=0.1
+        )
+    except:
+        pass
+
+while True:
+
+    ret, frame = cap.read()
+
+    if not ret:
+        continue
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    faces = face_cascade.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=5
+    )
+
+    h, w = frame.shape[:2]
+    frame_center = w // 2
+
+    if len(faces) > 0:
+
+        faces = sorted(
+            faces,
+            key=lambda x: x[2] * x[3],
+            reverse=True
+        )
+
+        x, y, fw, fh = faces[0]
+
+        face_center = x + fw // 2
+        error = face_center - frame_center
+        face_area = fw * fh
+
+        cv2.rectangle(
+            frame,
+            (x, y),
+            (x + fw, y + fh),
+            (0, 255, 0),
+            2
+        )
+
+        if error < -FACE_CENTER_TOLERANCE:
+
+            cv2.putText(
+                frame,
+                "LEFT",
+                (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 0, 255),
+                2
+            )
+
+            send(60, 120)
+
+        elif error > FACE_CENTER_TOLERANCE:
+
+            cv2.putText(
+                frame,
+                "RIGHT",
+                (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 0, 255),
+                2
+            )
+
+            send(120, 60)
+
+        else:
+
+            if face_area < FAR_FACE:
+
+                cv2.putText(
+                    frame,
+                    "FORWARD",
+                    (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (255, 0, 0),
+                    2
+                )
+
+                send(120, 120)
+
+            elif face_area > CLOSE_FACE:
+
+                cv2.putText(
+                    frame,
+                    "BACKWARD",
+                    (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (0, 0, 255),
+                    2
+                )
+
+                send(-120, -120)
+
+            else:
+
+                cv2.putText(
+                    frame,
+                    "STOP",
+                    (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (0, 255, 0),
+                    2
+                )
+
+                stop()
+
+    else:
+
+        cv2.putText(
+            frame,
+            "NO FACE",
+            (20, 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 0, 255),
+            2
+        )
+
+        stop()
+
+    cv2.line(
+        frame,
+        (frame_center, 0),
+        (frame_center, h),
+        (255, 255, 0),
+        2
+    )
+
+    cv2.imshow("CAMBOT", frame)
+
+    key = cv2.waitKey(1)
+
+    if key == 27:
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+stop()
