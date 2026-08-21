@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Car</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        /* Video Box */
+        .video-container {
+            width: 320px;
+            height: 240px;
+            background-color: black;
+            margin: 10px auto;
+            position: relative;
+            border: 2px solid #333;
+        }
+
+        .feed-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none; /* Pehle se hidden rahega */
+        }
+
+        /* 1. Grayscale Filter */
+        .gray-effect {
+            filter: grayscale(100%);
+        }
+
+        /* 2. Face Detection Box */
+        .face-box {
+            position: absolute;
+            top: 50px;
+            left: 100px;
+            width: 120px;
+            height: 120px;
+            border: 3px solid red; /* Unknown target ke liye Red box */
+            display: none;
+        }
+
+        .face-text {
+            background-color: red;
+            color: white;
+            font-size: 12px;
+            position: absolute;
+            top: -20px;
+            left: -3px;
+            padding: 2px;
+        }
+
+        /* Alignment styles */
+        .center-div {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        button {
+            padding: 10px;
+            margin: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            gap: 10px;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align: center;">Robot Car Controls</h1>
+
+    <!-- Video Feed Screen -->
+    <div class="video-container">
+        <!-- Sample image jo live camera feed ka kaam karegi -->
+        <img id="myFeed" class="feed-img" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=320&h=240" alt="Camera">
+        
+        <!-- Face Detection Graphic -->
+        <div id="myFaceBox" class="face-box">
+            <span class="face-text">UNKNOWN</span>
+        </div>
+    </div>
+
+    <!-- 3 Core Features Buttons -->
+    <div class="center-div">
+        <button onclick="startFeed()">Start Feed</button>
+        <button onclick="makeGrayscale()">Grayscale</button>
+        <button onclick="detectFace()">Face Detection</button>
+    </div>
+
+    <hr>
+
+    <!-- Movement Controls -->
+    <h3 style="text-align: center;">Move Car</h3>
+    <div class="grid-container">
+        <div></div>
+        <button onclick="move('forward')">Forward</button>
+        <div></div>
+
+        <button onclick="move('left')">Left</button>
+        <button onclick="move('stop')" style="background-color: red; color: white;">STOP</button>
+        <button onclick="move('right')">Right</button>
+
+        <div></div>
+        <button onclick="move('backward')">Back</button>
+        <div></div>
+    </div>
+
+    <script>
+        // 1. Start Feed Function
+        function startFeed() {
+            var img = document.getElementById("myFeed");
+            if (img.style.display === "none" || img.style.display === "") {
+                img.style.display = "block";
+            } else {
+                img.style.display = "none";
+                document.getElementById("myFaceBox").style.display = "none"; // feed band to box bhi band
+            }
+        }
+
+        // 2. Conversion to Grayscale Function
+        function makeGrayscale() {
+            var img = document.getElementById("myFeed");
+            img.classList.toggle("gray-effect");
+        }
+
+        // 3. Face Detection Function (Toggles Unknown Red Box)
+        function detectFace() {
+            var img = document.getElementById("myFeed");
+            var box = document.getElementById("myFaceBox");
+            
+            if (img.style.display === "block") {
+                if (box.style.display === "none" || box.style.display === "") {
+                    box.style.display = "block";
+                } else {
+                    box.style.display = "none";
+                }
+            } else {
+                alert("Pehle 'Start Feed' button dabaen.");
+            }
+        }
+
+        // Car Operations
+        function move(action) {
+            console.log("Action sent: " + action);
+        }
+    </script>
+
+</body>
+</html>
