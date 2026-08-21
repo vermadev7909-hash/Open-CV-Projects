@@ -1,0 +1,96 @@
+#include <WiFi.h>
+#include <WebServer.h>
+
+const char* ssid = "CAMBOT";
+const char* password = "12345678";
+
+WebServer server(80);
+
+// L298N Pins
+#define ENA 33
+#define IN1 25
+#define IN2 26
+
+#define ENB 32
+#define IN3 27
+#define IN4 14
+
+void stopMotors() {
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+}
+
+void drive() {
+
+  int leftSpeed = server.arg("left").toInt();
+  int rightSpeed = server.arg("right").toInt();
+
+  leftSpeed = constrain(leftSpeed, -255, 255);
+  rightSpeed = constrain(rightSpeed, -255, 255);
+
+  // LEFT MOTOR
+  if (leftSpeed >= 0) {
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+  } else {
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, HIGH);
+    leftSpeed = abs(leftSpeed);
+  }
+
+  // RIGHT MOTOR
+  if (rightSpeed >= 0) {
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
+  } else {
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, HIGH);
+    rightSpeed = abs(rightSpeed);
+  }
+
+  analogWrite(ENA, leftSpeed);
+  analogWrite(ENB, rightSpeed);
+
+  server.send(200, "text/plain", "OK");
+}
+
+void stopRoute() {
+  stopMotors();
+  server.send(200, "text/plain", "STOP");
+}
+
+void setup() {
+
+  Serial.begin(115200);
+
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+
+  stopMotors();
+
+  WiFi.softAP(ssid, password);
+
+  Serial.println();
+  Serial.println("CAMBOT AP Started");
+  Serial.println(WiFi.softAPIP());
+
+  server.on("/drive", drive);
+  server.on("/stop", stopRoute);
+
+  server.begin();
+}
+
+void loop() {
+  server.handleClient();
+}
