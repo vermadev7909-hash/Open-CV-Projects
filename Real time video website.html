@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Car Real-Time Face Detection</title>
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        /* Container to stack video and canvas exactly on top of each other */
+        .video-container {
+            width: 320px;
+            height: 240px;
+            background-color: black;
+            margin: 10px auto;
+            position: relative;
+            border: 2px solid #333;
+        }
+
+        video, canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Canvas layered above video for drawing the detection box */
+        canvas {
+            z-index: 10;
+        }
+
+        /* 1. Grayscale Filter effect */
+        .gray-effect {
+            filter: grayscale(100%);
+        }
+
+        .center-div {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        button {
+            padding: 10px;
+            margin: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            gap: 10px;
+            justify-content: center;
+        }
+
+        #statusText {
+            font-weight: bold;
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align: center;">Robot Car Controls</h1>
+    <p style="text-align: center;" id="statusText">Status: Waiting to Start Feed...</p>
+
+    <div class="video-container">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="overlay"></canvas>
+    </div>
+
+    <div class="center-div">
+        <button onclick="startFeed()">Start Feed</button>
+        <button onclick="makeGrayscale()">Grayscale</button>
+        <button onclick="toggleFaceDetection()">Face Detection</button>
+    </div>
+
+    <hr>
+
+    <h3 style="text-align: center;">Move Car</h3>
+    <div class="grid-container">
+        <div></div>
+        <button onclick="move('forward')">Forward</button>
+        <div></div>
+
+        <button onclick="move('left')">Left</button>
+        <button onclick="move('stop')" style="background-color: red; color: white;">STOP</button>
+        <button onclick="move('right')">Right</button>
+
+        <div></div>
+        <button onclick="move('backward')">Back</button>
+        <div></div>
+    </div>
+
+    <script>
+        let streamActive = false;
+        let localStream = null;
+        let isDetecting = false;
+        let detectionInterval = null;
+        let modelsLoaded = false;
+
+        const video = document.getElementById("webcam");
+        const canvas = document.getElementById("overlay");
+        const statusText = document.getElementById("statusText");
+
+        // Background me face detection models load karna
+        window.addEventListener('DOMContentLoaded', async () => {
+            statusText.innerText = "Status: Loading Face Detection Models...";
+            try {
+                // Loading lightweight models directly from public CDNs
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                modelsLoaded = true;
+                statusText.innerText = "Status: Models Loaded. Ready to Start.";
+            } catch (e) {
+                console.error(e);
+                statusText.innerText = "Status: Failed to load models. Check internet connection.";
+            }
+        });
+
+        // 1. Start/Stop Live Laptop Webcam Feed
+        function startFeed() {
+            if (!streamActive) {
+                navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                .then(function(stream) {
+                    localStream = stream;
+                    video.srcObject = stream;
+                    streamActive = true;
+                    statusText.innerText = "Status: Camera Live.";
+                })
+                .catch(function(error) {
+                    console.log("Camera access error: " + error);
+                    alert("Camera access issue!");
+                });
+            } else {
+                stopDetection();
+                if (localStream) {
+                    localStream.getTracks().forEach(track => track.stop());
+                }
+                video.srcObject = null;
+                streamActive = false;
+                const context = canvas.getContext('2d');
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                statusText.innerText = "Status: Camera Offline.";
+            }
+        }
+
+        // 2. Conversion to Grayscale
+        function makeGrayscale() {
+            video.classList.toggle("gray-effect");
+        }
+
+        // 3. Toggle Real-time Face Detection Loop
+        function toggleFaceDetection() {
+            if (!streamActive) {
+                alert("Pehle 'Start Feed' daba kar webcam on karein.");
+                return;
+            }
+            if (!modelsLoaded) {
+                alert("Models abhi tak load nahi hue hain. Kripya thoda wait karein.");
+                return;
+            }
+
+            if (!isDetecting) {
+                isDetecting = true;
+                statusText.innerText = "Status: Scanning for Faces...";
+                
+                // Real-time loop runs every 100ms
+                detectionInterval = setInterval(async () => {
+                    const displaySize = { width: video.offsetWidth, height: video.offsetHeight };
+                    faceapi.matchDimensions(canvas, displaySize);
+
+                    // Detect face using the TinyFaceDetector model
+                    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
+                    const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                    
+                    // Clear previous box frame
+                    const context = canvas.getContext('2d');
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // If a face is found, draw custom "UNKNOWN" red box
+                    if (resizedDetections.length > 0) {
+                        resizedDetections.forEach(detection => {
+                            const box = detection.box;
+                            
+                            // Styling box for unknown person (Red border)
+                            context.strokeStyle = 'red';
+                            context.lineWidth = 3;
+                            context.strokeRect(box.x, box.y, box.width, box.height);
+
+                            // Drawing Text Label Background
+                            context.fillStyle = 'red';
+                            context.fillRect(box.x, box.y - 20, 80, 20);
+
+                            // Text Style
+                            context.fillStyle = 'white';
+                            context.font = '14px Arial';
+                            context.fillText('UNKNOWN', box.x + 5, box.y - 5);
+                        });
+                        statusText.innerText = "Status: ⚠️ UNKNOWN PERSON DETECTED!";
+                    } else {
+                        statusText.innerText = "Status: Scanning... No face found.";
+                    }
+                }, 100);
+
+            } else {
+                stopDetection();
+            }
+        }
+
+        function stopDetection() {
+            isDetecting = false;
+            clearInterval(detectionInterval);
+            const context = canvas.getContext('2d');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            if(streamActive) statusText.innerText = "Status: Detection Stopped.";
+        }
+
+        // Car Operations Console Trigger
+        function move(action) {
+            console.log("Action sent: " + action);
+        }
+    </script>
+
+</body>
+</html>
