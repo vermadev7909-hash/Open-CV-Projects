@@ -1,0 +1,72 @@
+import cv2
+
+facecascade = cv2.CascadeClassifier(
+    cv2.data.haarcascades +
+    "haarcascade_frontalface_default.xml"
+)
+cap = cv2.VideoCapture(0)
+
+while True:
+
+    # Read a frame from webcam
+    ret, frame = cap.read()
+
+    # Exit if frame is not captured
+    if not ret:
+        break
+
+    # Convert frame to grayscale
+    gray = cv2.cvtColor(
+        frame,
+        cv2.COLOR_BGR2GRAY
+    )
+
+    # Detect faces
+    faces = facecascade.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=15,
+        minSize=(30, 30)
+    )
+
+    # Count detected faces
+    person_count = len(faces)
+
+    # Draw rectangle around each detected face
+    for (x, y, w, h) in faces:
+
+        cv2.rectangle(
+            frame,
+            (x, y),
+            (x + w, y + h),
+            (0, 255, 0),
+            2
+        )
+
+    # Display people count
+    cv2.putText(
+        frame,
+        "People Count : " + str(person_count),
+        (20, 40),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1,
+        (0, 0, 255),
+        2
+    )
+    for (x, y, w, h) in faces:
+        face_roi = frame[y:y + h, x:x + w]
+
+        # Apply Gaussian blur
+        blurred_face = cv2.GaussianBlur(face_roi, (99, 99), 30)
+
+        frame[y:y + h, x:x + w] = blurred_face
+
+    # Show output frame
+    cv2.imshow("FACE BLUR",frame)
+
+    # Exit when Q key is pressed
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
